@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from app.paths import app_dir
+
 AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma"}
 VIDEO_EXTS = {".mp4", ".mkv", ".mov", ".webm", ".avi", ".m4v", ".ts"}
 
@@ -12,12 +14,19 @@ SUPPORTED_EXTS = AUDIO_EXTS | VIDEO_EXTS
 _CREATE_NO_WINDOW = 0x08000000
 
 
+def _tool(name: str) -> str | None:
+    local = app_dir() / "ffmpeg" / f"{name}.exe"
+    if local.exists():
+        return str(local)
+    return shutil.which(name)
+
+
 def ffmpeg_path() -> str | None:
-    return shutil.which("ffmpeg")
+    return _tool("ffmpeg")
 
 
 def ffprobe_path() -> str | None:
-    return shutil.which("ffprobe")
+    return _tool("ffprobe")
 
 
 def is_supported(path: str | Path) -> bool:
@@ -31,7 +40,9 @@ def extract_audio(source: str | Path, destination: str | Path, sample_rate: int 
         raise FileNotFoundError(source)
     ffmpeg = ffmpeg_path()
     if not ffmpeg:
-        raise RuntimeError("ffmpeg was not found on PATH.")
+        raise RuntimeError(
+            "ffmpeg was not found on PATH or in the app's ffmpeg folder."
+        )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     command = [
@@ -41,6 +52,8 @@ def extract_audio(source: str | Path, destination: str | Path, sample_rate: int 
         "-i",
         str(source),
         "-vn",
+        "-af",
+        "loudnorm=I=-18:TP=-1.5:LRA=11",
         "-ac",
         "1",
         "-ar",

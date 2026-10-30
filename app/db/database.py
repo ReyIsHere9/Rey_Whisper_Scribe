@@ -118,6 +118,10 @@ class Database:
         self.conn.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
         self.conn.commit()
 
+    def rename_job(self, job_id: int, title: str) -> None:
+        self.conn.execute("UPDATE jobs SET title = ? WHERE id = ?", (title, job_id))
+        self.conn.commit()
+
     def delete_job(self, job_id: int) -> None:
         self.conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         self.conn.commit()

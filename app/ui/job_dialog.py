@@ -104,6 +104,20 @@ class JobDialog(QDialog):
         self.advanced_toggle.toggled.connect(self.advanced_box.setVisible)
         layout.addWidget(self.advanced_box)
 
+        for combo, key, fallback in (
+            (self.language, "default_language", "fa"),
+            (self.model, "default_model", "large-v3"),
+            (self.scope, "default_scope", "global"),
+        ):
+            index = combo.findData(db.setting(key, fallback))
+            combo.setCurrentIndex(max(0, index))
+        try:
+            expected = int(db.setting("default_expected_speakers", "0"))
+        except ValueError:
+            expected = 0
+        self.expected.setValue(max(0, min(20, expected)))
+        self.diarize.setChecked(db.setting("default_diarize", "1") == "1")
+
         layout.addStretch(1)
 
         buttons = QHBoxLayout()

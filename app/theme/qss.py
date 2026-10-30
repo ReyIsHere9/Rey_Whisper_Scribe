@@ -12,12 +12,12 @@ def _rgba(rgba: tuple[int, int, int, int]) -> str:
 TEMPLATE = Template(
     """
 * {
-    font-family: "Segoe UI", "Tahoma", sans-serif;
+    font-family: "Vazirmatn", "Segoe UI", "Tahoma", sans-serif;
     outline: none;
 }
 QWidget {
     color: $text;
-    font-size: 13px;
+    font-size: 14px;
 }
 QWidget#Root, QStackedWidget#Content {
     background: transparent;
@@ -32,33 +32,33 @@ QToolTip {
 QLabel { background: transparent; }
 QLabel#AppTitle {
     font-family: "Georgia", "Cambria", serif;
-    font-size: 25px;
+    font-size: 28px;
     font-weight: 600;
     color: #F7F2E9;
-    letter-spacing: 1px;
+    letter-spacing: 0.6px;
 }
 QLabel#AppSubtitle {
-    font-size: 10px;
-    color: rgba(247, 242, 233, 0.62);
-    letter-spacing: 3px;
+    font-size: 11px;
+    color: rgba(247, 242, 233, 0.72);
+    letter-spacing: 2.6px;
     text-transform: uppercase;
 }
 QLabel#SectionTitle {
     font-family: "Georgia", "Cambria", serif;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     color: $heading;
 }
 QLabel#Eyebrow {
-    font-size: 10px;
-    letter-spacing: 2px;
+    font-size: 10.5px;
+    letter-spacing: 1.8px;
     color: $text_muted;
     text-transform: uppercase;
 }
 QLabel#Muted { color: $text_muted; }
 QLabel#Heading {
     font-family: "Georgia", "Cambria", serif;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 600;
     color: $heading;
 }
@@ -67,9 +67,9 @@ QLabel#Chip, QLabel#DemoChip, QLabel#StatusChip, QLabel#MetaChip {
     color: $chip_text;
     border: 1px solid $border;
     border-radius: 9px;
-    padding: 3px 9px;
-    font-size: 10px;
-    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    letter-spacing: 0.3px;
 }
 QLabel#DemoChip {
     background: transparent;
@@ -83,53 +83,66 @@ QLabel#StatusChip {
 }
 QLabel#SegText {
     color: $text;
-    font-size: 14px;
-    line-height: 150%;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 165%;
 }
 QLabel#SegName {
     color: $heading;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
 }
 QLabel#SegTime {
     color: $text_muted;
     font-family: "Cascadia Mono", "Consolas", monospace;
-    font-size: 10px;
+    font-size: 11px;
 }
-QLabel#SpeakMeta { color: $text_muted; font-size: 11px; }
+QLabel#SpeakMeta { color: $text_muted; font-size: 12px; }
 QLabel#JobTitle {
     color: #F3EDE4;
-    font-size: 12px;
+    font-size: 13.5px;
     font-weight: 600;
     background: transparent;
 }
 QLabel#JobMeta {
-    color: rgba(243, 237, 228, 0.5);
-    font-size: 10px;
+    color: rgba(243, 237, 228, 0.58);
+    font-size: 11.5px;
     background: transparent;
 }
 QLabel#SidebarHeading {
-    color: rgba(243, 237, 228, 0.42);
-    font-size: 9px;
-    letter-spacing: 2px;
+    color: rgba(243, 237, 228, 0.52);
+    font-size: 10px;
+    letter-spacing: 1.8px;
     background: transparent;
 }
 QLabel#SidebarFoot {
-    color: rgba(243, 237, 228, 0.3);
-    font-size: 9px;
+    color: rgba(243, 237, 228, 0.35);
+    font-size: 9.5px;
     background: transparent;
 }
 QLabel#EmptyTitle {
     font-family: "Georgia", "Cambria", serif;
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 600;
     color: $heading;
 }
-QLabel#PlayerTitle { color: rgba(245, 241, 234, 0.62); font-size: 11px; }
+QLabel#PlayerTitle { color: rgba(245, 241, 234, 0.68); font-size: 12px; }
 QLabel#PlayerTime {
-    color: rgba(245, 241, 234, 0.82);
+    color: rgba(245, 241, 234, 0.86);
     font-family: "Cascadia Mono", "Consolas", monospace;
-    font-size: 11px;
+    font-size: 12px;
+}
+QLabel#SpeakerSection {
+    color: $text_muted;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.6px;
+    padding: 8px 6px 2px 6px;
+}
+QLabel#PanelHint {
+    color: $text_muted;
+    font-size: 12px;
+    padding: 2px 2px 4px 2px;
 }
 
 QFrame#Header {
@@ -143,6 +156,29 @@ QFrame#Panel {
     background: $panel;
     border: 1px solid $border;
     border-radius: 12px;
+}
+QFrame#Panel[highlight="true"] {
+    border-color: $accent;
+}
+QMenu {
+    background: $panel;
+    color: $text;
+    border: 1px solid $border_strong;
+    border-radius: 8px;
+    padding: 6px;
+}
+QMenu::item {
+    padding: 7px 24px 7px 12px;
+    border-radius: 6px;
+}
+QMenu::item:selected {
+    background: $accent;
+    color: $accent_text;
+}
+QMenu::separator {
+    height: 1px;
+    background: $border;
+    margin: 5px 6px;
 }
 QFrame#PlayerBar {
     background: $leather_dark;
@@ -204,14 +240,17 @@ QPushButton {
     color: $text;
     border: 1px solid $border;
     border-radius: 8px;
-    padding: 7px 14px;
+    padding: 8px 15px;
+    font-size: 13.5px;
+    min-height: 20px;
 }
 QPushButton:hover {
     border-color: $accent;
     color: $accent;
+    background: $panel_alt;
 }
 QPushButton:pressed { background: $panel_alt; }
-QPushButton:disabled { color: $text_muted; border-color: $border; }
+QPushButton:disabled { color: $text_muted; border-color: $border; background: transparent; }
 
 QPushButton#Primary {
     background: $accent;
@@ -235,11 +274,54 @@ QPushButton#HeaderPrimary:hover { background: #FFFFFF; border-color: #FFFFFF; }
 
 QPushButton#Ghost {
     background: transparent;
+    border: 1px solid $border_strong;
+    color: $text;
+    padding: 7px 13px;
+}
+QPushButton#Ghost:hover {
+    color: $accent;
+    background: $panel_alt;
+    border-color: $accent;
+}
+QPushButton#Ghost[active="true"] {
+    background: $accent;
+    border-color: $accent;
+    color: $accent_text;
+}
+QPushButton#JobMenu {
+    background: transparent;
+    border: 1px solid transparent;
+    color: rgba(243, 237, 228, 0.65);
+    padding: 0px;
+    min-height: 18px;
+    max-height: 18px;
+    min-width: 22px;
+    max-width: 22px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+QPushButton#JobMenu:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #FFFFFF;
+}
+QPushButton#RowAction {
+    background: transparent;
     border: 1px solid transparent;
     color: $text_muted;
-    padding: 7px 10px;
+    padding: 0px;
+    min-height: 22px;
+    max-height: 22px;
+    min-width: 24px;
+    max-width: 24px;
+    border-radius: 5px;
+    font-size: 13px;
 }
-QPushButton#Ghost:hover { color: $accent; background: $panel_alt; }
+QPushButton#RowAction:hover {
+    background: $panel_alt;
+    border-color: $border;
+    color: $accent;
+}
 
 QPushButton[variant="header"] {
     background: rgba(255, 255, 255, 0.06);
@@ -259,12 +341,12 @@ QPushButton[variant="nav"] {
     border-$side: 2px solid transparent;
     border-radius: 6px;
     text-align: $nav_align;
-    padding: 9px 12px;
-    color: rgba(245, 241, 234, 0.62);
-    font-size: 13px;
+    padding: 10px 12px;
+    color: rgba(245, 241, 234, 0.74);
+    font-size: 14px;
 }
 QPushButton[variant="nav"]:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.07);
     color: #FBF8F2;
 }
 QPushButton[variant="nav"][active="true"] {
@@ -278,11 +360,20 @@ QLineEdit, QComboBox, QSpinBox {
     color: $text;
     border: 1px solid $border;
     border-radius: 7px;
-    padding: 6px 10px;
-    min-height: 18px;
+    padding: 7px 10px;
+    min-height: 22px;
+    font-size: 14px;
 }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: $accent; }
 QComboBox::drop-down { border: none; background: transparent; width: 22px; }
+QFrame#Sidebar QLineEdit, QFrame#Sidebar QComboBox {
+    background: rgba(255, 255, 255, 0.07);
+    color: #F5F0E8;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+}
+QFrame#Sidebar QLineEdit:focus, QFrame#Sidebar QComboBox:focus {
+    border-color: $accent;
+}
 QComboBox QAbstractItemView {
     background: $panel;
     color: $text;
@@ -293,7 +384,7 @@ QComboBox QAbstractItemView {
 }
 QSpinBox::up-button, QSpinBox::down-button { width: 16px; border: none; }
 
-QCheckBox { color: $text; spacing: 8px; }
+QCheckBox { color: $text; spacing: 8px; font-size: 13.5px; }
 QCheckBox::indicator {
     width: 16px;
     height: 16px;
@@ -339,7 +430,7 @@ QStatusBar {
     background: $bg_alt;
     border-top: 1px solid $border;
     color: $text_muted;
-    font-size: 11px;
+    font-size: 12px;
 }
 QStatusBar::item { border: none; }
 QStatusBar QLabel, QStatusBar QWidget { background: transparent; }

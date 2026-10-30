@@ -13,18 +13,21 @@ Whisper Scribe is a Windows desktop app built with PySide6, [faster-whisper](htt
 - Persian (`fa`), English (`en`), mixed Persian/English, and auto-detect modes
 - Whisper **large-v3** by default (optional Turbo model)
 - Word-level timestamps and speaker diarization
-- Global or per-job speaker library, speaker merge, and manual add
+- Global or per-job speaker library, grouped speaker sections, search/sort, merge, rename, and manual add
 - Per-line speaker correction: select one or more transcript lines and assign them to a speaker
-- Click-to-seek playback, transcript editing, and TXT/SRT export
+- Transcript search/sort, rename, delete, show source, and TXT/SRT export
+- Click-to-seek playback and single-click transcript editing
+- Settings for theme, language, and new-job defaults
 - Live progress, elapsed time, and cancel while transcribing
+- Bundled Vazirmatn Persian typography and readable larger UI text
 - English and Persian/RTL UI, light and dark themes
 - Everything runs locally after the models are downloaded
 
 ## Requirements
 
 - Windows 11 (64-bit)
-- Python 3.13
-- FFmpeg on `PATH` (used to extract audio from video/audio files)
+- Python 3.13 (only needed for development and building the EXE)
+- FFmpeg on `PATH` (only needed for development; the EXE build copies it)
 - NVIDIA GPU with a CUDA 12.6 driver **strongly recommended** (CPU works, but is much slower)
 - About 8 GB free disk space for Python packages and models
 
@@ -113,6 +116,37 @@ or:
 
 `run.bat` creates the virtual environment and installs the lightweight UI dependencies if they are missing. The heavy ML dependencies from step 2 must be installed once manually.
 
+## Portable Windows EXE
+
+Build a double-clickable, self-contained app folder:
+
+```powershell
+pip install -r requirements-dev.txt
+build_exe.bat
+```
+
+Output:
+
+```text
+dist\WhisperScribe\WhisperScribe.exe
+```
+
+Keep or share the **entire** `dist\WhisperScribe` folder. It contains the EXE, the Python/Qt/ML runtime, `models\`, `ffmpeg\`, and a `data\` folder created on first run. No Python or FFmpeg installation is needed on the target PC.
+
+The folder is about **7.5 GB** because it contains CUDA PyTorch and the large-v3 model. This is a one-folder build, not a single-file EXE: a single file would unpack several gigabytes on every launch.
+
+`build_exe.bat` copies `models` and the system `ffmpeg.exe`/`ffprobe.exe` next to the EXE. If FFmpeg is not on `PATH`, copy those two files into `dist\WhisperScribe\ffmpeg\`.
+
+Keep the app in a writable folder (not `C:\Program Files`) so it can create `data\` and write exports.
+
+Diagnostics for the built EXE:
+
+```powershell
+.\WhisperScribe.exe --selftest C:\path\to\audio.wav --selftest-output selftest.txt
+```
+
+The windowed EXE writes the result to `selftest.txt`. If it fails before the window appears, check `startup-error.log` next to the EXE.
+
 ## Where the models live (and copying to another PC)
 
 Everything stays inside the project folder:
@@ -150,6 +184,22 @@ Optional: the **Turbo** model is available in Advanced options. It is not downlo
 
 Exports default to `<repo>\data\exports`.
 
+### Editing, searching, and organizing transcripts
+
+- Click **Edit**, then **single-click any transcript line** to edit it. Press Enter to save. The line editor supports Persian right-to-left text.
+- Use the **Search transcripts** field and **Sort** menu in the sidebar to find jobs.
+- Click the **⋯** menu on a transcript card to **Rename**, **Export**, **Show source file**, or **Delete** it.
+- Deleting a transcript removes it from the library and database only. The original audio/video file is not deleted.
+
+### Settings
+
+Click **Settings** in the sidebar to change:
+
+- Theme (Parchment / Midnight) and interface language
+- Default language, model, expected speakers, speaker scope, and diarization for new jobs
+- Open the models or data folders directly
+
+
 ### What diarization is
 
 Diarization is the **“who spoke when”** pass. It splits the audio into speaker turns and labels each transcript segment with a speaker (`Speaker 00`, `Speaker 01`, …). It never combines people's text into one block and it never rewrites the transcript. It only adds a speaker label to each line.
@@ -169,10 +219,20 @@ Only the selected segments change. The timeline, text, and all other lines stay 
 
 Other speaker tools:
 
-- The speaker scope can be **Global** (shared library) or **Job only**. The New Transcription dialog sets the scope for the new job.
-- **Double-click a speaker** in the panel to rename it.
+- The speaker panel shows **All speakers**, only the **global library**, or only **this job**.
+- All view is split into **Global** and **This job** sections, with search and sort (name, turns, speaking time) so the list stays manageable.
+- Click the **pencil** beside a speaker (or double-click the speaker) to rename it.
+- **Merge mode** combines two labels when diarization split one person into two.
 - **Add speaker** creates an empty speaker entry for manual labeling.
 - Voice enrollment is not part of this build yet.
+
+### Persian accuracy tips
+
+- For a mostly Persian file, choose **Persian** rather than **Mixed**. Mixed uses Whisper language auto-detection, which can pick the wrong language if the file starts with English.
+- Keep the model on **large-v3 · best accuracy**; Turbo is faster but less accurate.
+- The app loudness-normalizes extracted audio and uses a Persian prompt plus previous-context conditioning to improve punctuation and continuity.
+- Use the cleanest source audio you have; background music and heavy noise still hurt Whisper accuracy.
+- Set **Expected speakers** only when you actually know the number; otherwise leave it on Auto.
 
 ### Privacy and local data
 
@@ -222,6 +282,12 @@ Antivirus/Defender can scan the 3 GB model. Later launches are faster.
 
 **`libtorchcodec` / FFmpeg DLL errors**
 The app decodes extracted WAV files itself and passes tensors to pyannote, so diarization does not depend on torchcodec’s FFmpeg decoder. Keep `torchcodec==0.17.0` installed as required by pyannote; if you see an error, reinstall the exact versions from `requirements-ml.txt`.
+
+**The EXE closes immediately or shows no window**
+Check `startup-error.log` next to `WhisperScribe.exe`. It contains the traceback. The most common causes are a missing `models` or `ffmpeg` folder, or running from a non-writable location.
+
+**The EXE cannot create `data` or `exports`**
+Move the whole `dist\WhisperScribe` folder somewhere writable, such as `X:\Apps\WhisperScribe`.
 
 **Long job and the app was closed**
 On startup, a job that was processing is marked failed, unless partial transcript segments were already saved; in that case it is marked transcribed so you can still read/export them.
@@ -285,4 +351,6 @@ run.bat
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and [OpenAI Whisper](https://github.com/openai/whisper)
 - [pyannote.audio](https://github.com/pyannote/pyannote-audio)
 - [PySide6 / Qt for Python](https://doc.qt.io/qtforpython/)
+- [Vazirmatn font](https://github.com/rastikerdar/vazirmatn) (SIL Open Font License)
 - [FFmpeg](https://ffmpeg.org/)
+

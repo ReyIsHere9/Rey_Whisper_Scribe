@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -75,6 +76,15 @@ class SpeakerRow(QFrame):
         self.check.toggled.connect(self._on_check)
         layout.addWidget(self.check, 0, Qt.AlignmentFlag.AlignRight)
 
+        self.edit_button = QPushButton("✎")
+        self.edit_button.setObjectName("RowAction")
+        self.edit_button.setToolTip(i18n.t("rename_speaker"))
+        self.edit_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.edit_button.clicked.connect(
+            lambda: self.rename_requested.emit(self.speaker_id)
+        )
+        layout.addWidget(self.edit_button, 0, Qt.AlignmentFlag.AlignRight)
+
         self._merge_mode = merge_mode
         if merge_mode:
             self._apply_selected(False)
@@ -94,6 +104,7 @@ class SpeakerRow(QFrame):
     def set_merge_mode(self, enabled: bool) -> None:
         self._merge_mode = enabled
         self.check.setVisible(enabled)
+        self.edit_button.setVisible(not enabled)
         if not enabled:
             self.check.setChecked(False)
 
@@ -147,6 +158,14 @@ class SpeakerPanel(QFrame):
         self.scope_combo.currentIndexChanged.connect(self._on_scope_changed)
         outer.addWidget(self.scope_combo)
 
+        self.search = QLineEdit()
+        self.search.textChanged.connect(self.refresh)
+        outer.addWidget(self.search)
+
+        self.sort_combo = QComboBox()
+        self.sort_combo.currentIndexChanged.connect(self.refresh)
+        outer.addWidget(self.sort_combo)
+
         self.merge_check = QCheckBox()
         self.merge_check.toggled.connect(self.set_merge_mode)
         outer.addWidget(self.merge_check)
@@ -184,14 +203,13 @@ class SpeakerPanel(QFrame):
         actions = QHBoxLayout()
         actions.setSpacing(6)
         self.btn_enroll = QPushButton()
-        self.btn_enroll.setObjectName("Ghost")
-        self.btn_enroll.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_enroll.setVisible(False)
         self.btn_enroll.clicked.connect(self.enroll_requested)
         self.btn_add = QPushButton()
         self.btn_add.setObjectName("Ghost")
         self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add.clicked.connect(self.add_speaker_requested)
-        actions.addWidget(self.btn_enroll)
+        actions.addStretch(1)
         actions.addWidget(self.btn_add)
         outer.addLayout(actions)
 
@@ -205,25 +223,57 @@ class SpeakerPanel(QFrame):
         self.btn_merge.setText(self.i18n.t("merge_selected"))
         self.btn_enroll.setText(self.i18n.t("enroll_voice"))
         self.btn_add.setText(self.i18n.t("add_speaker"))
+        self.search.setPlaceholderText(self.i18n.t("search_speakers"))
 
+        scope_data = self.scope_combo.currentData() or "all"
         self.scope_combo.blockSignals(True)
-        current = self.scope_combo.currentIndex()
         self.scope_combo.clear()
-        self.scope_combo.addItem(self.i18n.t("scope_global"))
-        self.scope_combo.addItem(self.i18n.t("scope_job"))
-        self.scope_combo.setCurrentIndex(max(0, current))
+        self.scope_combo.addItem(self.i18n.t("all_speakers"), "all")
+        self.scope_combo.addItem(self.i18n.t("scope_global"), "global")
+        self.scope_combo.addItem(self.i18n.t("scope_job"), "job")
+        index = self.scope_combo.findData(scope_data)
+        self.scope_combo.setCurrentIndex(max(0, index))
         self.scope_combo.blockSignals(False)
+
+        sort_data = self.sort_combo.currentData() or "name_az"
+        self.sort_combo.blockSignals(True)
+        self.sort_combo.clear()
+        self.sort_combo.addItem(self.i18n.t("sort_name_az"), "name_az")
+        self.sort_combo.addItem(self.i18n.t("sort_name_za"), "name_za")
+        self.sort_combo.addItem(self.i18n.t("sort_turns"), "turns")
+        self.sort_combo.addItem(self.i18n.t("sort_time"), "time")
+        index = self.sort_combo.findData(sort_data)
+        self.sort_combo.setCurrentIndex(max(0, index))
+        self.sort_combo.blockSignals(False)
 
     def set_job(self, job_id: int | None, db) -> None:
         self._job_id = job_id
         self._db = db
         self.refresh()
 
-    def _include_global(self) -> bool:
-        return self.scope_combo.currentIndex() == 0
+    def _scope(self) -> str:
+        return self.scope_combo.currentData() or "all"
+
+    def new_speaker_is_global(self) -> bool:
+        return self._scope() != "job"
+
+    def focus_library(self) -> None:
+        index = self.scope_combo.findData("all")
+        self.scope_combo.setCurrentIndex(max(0, index))
+        self.search.clear()
+        self.setProperty("highlight", "true")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        QTimer.singleShot(1800, self._clear_highlight)
+        self.search.setFocus()
+
+    def _clear_highlight(self) -> None:
+        self.setProperty("highlight", "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def _on_scope_changed(self, _index: int) -> None:
-        self.scope_changed.emit("global" if self._include_global() else "job")
+        self.scope_changed.emit(self._scope())
         self.refresh()
 
     def _clear_rows(self) -> None:
@@ -239,26 +289,76 @@ class SpeakerPanel(QFrame):
         self._clear_rows()
         self.count_chip.setText("0")
 
+    def _add_section(self, title: str) -> None:
+        label = QLabel(title)
+        label.setObjectName("SpeakerSection")
+        self.rows_layout.insertWidget(self.rows_layout.count() - 1, label)
+
     def refresh(self) -> None:
         if self._db is None or self._job_id is None:
             return
-        speakers = self._db.speakers(self._job_id, include_global=self._include_global())
+        scope = self._scope()
+        if scope == "global":
+            groups = [(None, self._db.speakers(None, include_global=True))]
+        elif scope == "job":
+            groups = [(None, self._db.speakers(self._job_id, include_global=False))]
+        else:
+            global_speakers = self._db.speakers(None, include_global=True)
+            job_speakers = self._db.speakers(self._job_id, include_global=False)
+            groups = [
+                (self.i18n.t("scope_global").upper(), global_speakers),
+                (self.i18n.t("scope_job").upper(), job_speakers),
+            ]
+
         stats = self._db.speaker_stats(self._job_id)
+        query = self.search.text().strip().casefold()
+        sort_mode = self.sort_combo.currentData() or "name_az"
+
+        def sort_key(speaker):
+            speaker_id = int(speaker["id"])
+            if sort_mode == "turns":
+                return -int(stats.get(speaker_id, {}).get("turns", 0))
+            if sort_mode == "time":
+                return -int(stats.get(speaker_id, {}).get("ms", 0))
+            return speaker["name"].casefold()
+
         self._clear_rows()
+        total = 0
+        for section, speakers in groups:
+            filtered = [
+                speaker
+                for speaker in speakers
+                if not query or query in speaker["name"].casefold()
+            ]
+            filtered.sort(key=sort_key, reverse=sort_mode == "name_za")
+            if not filtered:
+                continue
+            if section:
+                self._add_section(section)
+            for speaker in filtered:
+                row = SpeakerRow(
+                    speaker,
+                    stats.get(int(speaker["id"]), {}),
+                    self.i18n,
+                    self._merge_mode,
+                )
+                row.toggled.connect(self._update_merge_button)
+                row.rename_requested.connect(self._rename_speaker)
+                self.rows_layout.insertWidget(self.rows_layout.count() - 1, row)
+                self._rows.append(row)
+                total += 1
 
-        for speaker in speakers:
-            row = SpeakerRow(
-                speaker,
-                stats.get(int(speaker["id"]), {}),
-                self.i18n,
-                self._merge_mode,
+        if total == 0:
+            empty = QLabel(
+                self.i18n.t("no_job_speakers")
+                if scope == "job"
+                else self.i18n.t("no_matches")
             )
-            row.toggled.connect(self._update_merge_button)
-            row.rename_requested.connect(self._rename_speaker)
-            self.rows_layout.insertWidget(self.rows_layout.count() - 1, row)
-            self._rows.append(row)
+            empty.setObjectName("Muted")
+            empty.setWordWrap(True)
+            self.rows_layout.insertWidget(self.rows_layout.count() - 1, empty)
 
-        self.count_chip.setText(str(len(speakers)))
+        self.count_chip.setText(str(total))
         self._update_merge_button()
 
     def set_merge_mode(self, enabled: bool) -> None:

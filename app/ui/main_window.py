@@ -3,8 +3,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -34,6 +35,7 @@ from app.ui.header import Header
 from app.ui.i18n import I18n
 from app.ui.job_dialog import JobDialog
 from app.ui.player import PlayerBar
+from app.ui.settings_dialog import SettingsDialog
 from app.ui.sidebar import Sidebar
 from app.ui.speaker_panel import SpeakerPanel
 from app.ui.transcript import TranscriptView
@@ -201,6 +203,7 @@ class MainWindow(QMainWindow):
         self.header.theme_toggled.connect(self._toggle_theme)
         self.header.language_toggled.connect(self._toggle_language)
         self.sidebar.job_selected.connect(self._select_job)
+        self.sidebar.job_menu.connect(self._job_menu)
         self.sidebar.nav_changed.connect(self._on_nav)
         self.speakers.merge_requested.connect(self._merge_speakers)
         self.speakers.add_speaker_requested.connect(self._add_speaker)
@@ -301,8 +304,26 @@ class MainWindow(QMainWindow):
         self.i18n.set_lang("fa" if self.i18n.lang == "en" else "en")
 
     def _on_nav(self, key: str) -> None:
-        if key != "transcripts":
-            self.statusBar().showMessage(self.i18n.t("not_implemented"), 3000)
+        if key == "transcripts":
+            self.stack.setCurrentWidget(
+                self.transcript if self.current_job_id is not None else self.empty
+            )
+            return
+        if key == "speakers":
+            self.speakers.focus_library()
+            self.sidebar.set_active_nav("transcripts")
+            self.statusBar().showMessage(self.i18n.t("speakers_nav_hint"), 5000)
+            return
+        if key == "settings":
+            dialog = SettingsDialog(self.i18n, self.db, self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.theme = dialog.theme_value
+                self._apply_theme()
+                if dialog.lang_value != self.i18n.lang:
+                    self.i18n.set_lang(dialog.lang_value)
+                self.statusBar().showMessage(self.i18n.t("settings_saved"), 5000)
+            self.sidebar.set_active_nav("transcripts")
+            return
 
     def _new_job(self, initial_file: str = "") -> None:
         if self._busy:
@@ -464,7 +485,7 @@ class MainWindow(QMainWindow):
             name = name.strip()
             if not accepted or not name:
                 return
-            is_global = self.speakers.scope_combo.currentIndex() == 0
+            is_global = self.speakers.new_speaker_is_global()
             speaker_id = self.db.add_speaker(
                 None if is_global else self.current_job_id, name, is_global=is_global
             )
@@ -501,7 +522,7 @@ class MainWindow(QMainWindow):
     def _add_speaker(self) -> None:
         if self.current_job_id is None:
             return
-        is_global = self.speakers.scope_combo.currentIndex() == 0
+        is_global = self.speakers.new_speaker_is_global()
         existing = self.db.speakers(
             self.current_job_id, include_global=True
         )
@@ -525,13 +546,84 @@ class MainWindow(QMainWindow):
             if job is not None:
                 self.transcript.load(job, self.db.segments(self.current_job_id))
 
-    def _export(self) -> None:
-        if self.current_job_id is None:
-            return
-        job = self.db.job(self.current_job_id)
+    def _job_menu(self, job_id: int, position) -> None:
+        job = self.db.job(job_id)
         if job is None:
             return
-        segments = self.db.segments(self.current_job_id)
+        menu = QMenu(self)
+        rename_action = menu.addAction(self.i18n.t("rename_job"))
+        export_action = menu.addAction(self.i18n.t("export"))
+        source_action = None
+        if job["source_path"] and Path(job["source_path"]).exists():
+            source_action = menu.addAction(self.i18n.t("reveal_source"))
+        menu.addSeparator()
+        delete_action = menu.addAction(self.i18n.t("delete_job"))
+        chosen = menu.exec(position)
+        if chosen is rename_action:
+            self._rename_job(job_id, job["title"])
+        elif chosen is export_action:
+            self._export_for(job_id)
+        elif source_action is not None and chosen is source_action:
+            QDesktopServices.openUrl(
+                QUrl.fromLocalFile(str(Path(job["source_path"]).parent))
+            )
+        elif chosen is delete_action:
+            self._delete_job(job_id, job["title"])
+
+    def _rename_job(self, job_id: int, current_title: str) -> None:
+        title, accepted = QInputDialog.getText(
+            self,
+            self.i18n.t("rename_job"),
+            self.i18n.t("rename_job"),
+            text=current_title,
+        )
+        title = title.strip()
+        if not accepted or not title:
+            return
+        self.db.rename_job(job_id, title)
+        self.sidebar.refresh_jobs(self.db.jobs(), self.current_job_id)
+        if self.current_job_id == job_id:
+            self._select_job(job_id)
+
+    def _delete_job(self, job_id: int, title: str) -> None:
+        if self._busy and job_id == self.current_job_id:
+            QMessageBox.information(
+                self, self.i18n.t("delete_job"), self.i18n.t("job_busy")
+            )
+            return
+        answer = QMessageBox.question(
+            self,
+            self.i18n.t("delete_job"),
+            self.i18n.t("delete_job_confirm").format(title=title),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        was_current = self.current_job_id == job_id
+        self.db.delete_job(job_id)
+        jobs = self.db.jobs()
+        if was_current:
+            if jobs:
+                self._select_job(int(jobs[0]["id"]))
+            else:
+                self.current_job_id = None
+                self.stack.setCurrentWidget(self.empty)
+                self.speakers.clear()
+                self.player.clear()
+        self.sidebar.refresh_jobs(jobs, self.current_job_id)
+        self._update_counts()
+        self.statusBar().showMessage(self.i18n.t("job_deleted"), 5000)
+
+    def _export(self) -> None:
+        if self.current_job_id is not None:
+            self._export_for(self.current_job_id)
+
+    def _export_for(self, job_id: int) -> None:
+        job = self.db.job(job_id)
+        if job is None:
+            return
+        segments = self.db.segments(job_id)
         path, _selected = QFileDialog.getSaveFileName(
             self,
             self.i18n.t("export"),

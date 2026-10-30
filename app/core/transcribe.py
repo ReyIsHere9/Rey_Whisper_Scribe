@@ -19,6 +19,10 @@ class EngineUnavailable(RuntimeError):
 
 MODEL_ALIASES = {"large-v3": "large-v3", "turbo": "large-v3-turbo"}
 AUTO_LANGUAGES = {"auto", "mixed"}
+PERSIAN_PROMPT = (
+    "این یک رونویسی فارسی است. متن را با املای درست و علائم نگارشی فارسی بنویس. "
+    "کلمات و اصطلاحات انگلیسی را به انگلیسی حفظ کن."
+)
 
 
 def engine_available() -> bool:
@@ -99,14 +103,19 @@ class FasterWhisperEngine:
 
         audio = _load_audio(audio_path)
         language = None if config.language in AUTO_LANGUAGES else config.language
+        initial_prompt = (
+            PERSIAN_PROMPT if config.language in {"fa", "mixed"} else None
+        )
         raw_segments, info = model.transcribe(
             audio,
             language=language,
             task="transcribe",
             beam_size=5,
             vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 500},
-            condition_on_previous_text=False,
+            vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 300},
+            condition_on_previous_text=True,
+            repetition_penalty=1.05,
+            initial_prompt=initial_prompt,
             word_timestamps=True,
         )
 

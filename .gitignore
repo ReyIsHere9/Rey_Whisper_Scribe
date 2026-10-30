@@ -51,6 +51,9 @@ shots/
 # Local models (large, downloaded)
 models/
 
+# Crash log written beside a frozen build if startup fails
+startup-error.log
+
 # Lint / test caches
 .ruff_cache/
 .mypy_cache/

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from app.core.models import JobCancelled, JobConfig, SpeakerTurn
-from app.paths import ROOT_DIR
+from app.paths import app_dir
 
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
@@ -24,7 +24,7 @@ def hf_token() -> str | None:
     if token:
         return token.strip()
     for name in ("tokenhg.txt", "hf_token.txt", ".hf_token"):
-        path = ROOT_DIR / name
+        path = app_dir() / name
         if path.exists():
             value = path.read_text(encoding="utf-8").strip()
             if value:

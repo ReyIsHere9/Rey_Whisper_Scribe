@@ -130,13 +130,18 @@ class SegmentCard(QFrame):
         self._select_mode = enabled
         self.check.setVisible(enabled)
         self.text_label.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents, enabled
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents,
+            enabled or self._edit_mode,
         )
         if not enabled:
             self.set_selected(False)
 
     def set_edit_mode(self, enabled: bool) -> None:
         self._edit_mode = enabled
+        self.text_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents,
+            enabled or self._select_mode,
+        )
         if not enabled:
             self._stop_edit()
         self.setCursor(
@@ -148,6 +153,10 @@ class SegmentCard(QFrame):
             if self._select_mode:
                 if not self.check.geometry().contains(event.position().toPoint()):
                     self.check.toggle()
+                event.accept()
+                return
+            if self._edit_mode:
+                self._start_edit()
                 event.accept()
                 return
             self.seeked.emit(self.start_ms)
@@ -162,6 +171,11 @@ class SegmentCard(QFrame):
     def _start_edit(self) -> None:
         self.text_label.setVisible(False)
         self.editor.setText(self._text)
+        self.editor.setLayoutDirection(
+            Qt.LayoutDirection.RightToLeft
+            if has_persian(self._text)
+            else Qt.LayoutDirection.LeftToRight
+        )
         self.editor.setVisible(True)
         self.editor.setFocus()
         self.editor.selectAll()
@@ -260,6 +274,12 @@ class TranscriptView(QFrame):
 
         outer.addWidget(Divider(height=20))
 
+        self.hint = QLabel()
+        self.hint.setObjectName("PanelHint")
+        self.hint.setWordWrap(True)
+        self.hint.setVisible(False)
+        outer.addWidget(self.hint)
+
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -296,16 +316,32 @@ class TranscriptView(QFrame):
         self.btn_select.setToolTip(self.i18n.t("select_hint"))
         self.btn_export.setText(self.i18n.t("export"))
         self._update_select_texts()
+        self._update_hint()
         if self._job is not None:
             self.load(self._job, self._segments)
+
+    def _update_hint(self) -> None:
+        if self._select_mode:
+            self.hint.setText(self.i18n.t("select_hint"))
+            self.hint.setVisible(True)
+        elif self._edit_mode:
+            self.hint.setText(self.i18n.t("edit_hint"))
+            self.hint.setVisible(True)
+        else:
+            self.hint.setVisible(False)
 
     def _toggle_edit(self) -> None:
         if not self._edit_mode and self._select_mode:
             self._set_select_mode(False)
         self._edit_mode = not self._edit_mode
+        self.btn_edit.setProperty("active", "true" if self._edit_mode else "false")
+        _repolish(self.btn_edit)
         for card in self._cards:
             card.set_edit_mode(self._edit_mode)
-        self.retranslate()
+        self.btn_edit.setText(
+            self.i18n.t("done") if self._edit_mode else self.i18n.t("edit")
+        )
+        self._update_hint()
 
     def _toggle_select(self) -> None:
         if not self._segments or self._message_label is not None:
@@ -319,12 +355,15 @@ class TranscriptView(QFrame):
 
     def _set_select_mode(self, enabled: bool) -> None:
         self._select_mode = enabled
+        self.btn_select.setProperty("active", "true" if enabled else "false")
+        _repolish(self.btn_select)
         self._selected_ids.clear()
         for card in self._cards:
             card.set_select_mode(enabled)
             card.set_selected(False)
         self.btn_assign.setVisible(enabled)
         self._update_select_texts()
+        self._update_hint()
 
     def _update_select_texts(self) -> None:
         self.btn_select.setText(
@@ -362,6 +401,11 @@ class TranscriptView(QFrame):
         self._select_mode = False
         self._selected_ids.clear()
         self.btn_assign.setVisible(False)
+        self.hint.setVisible(False)
+        self.btn_select.setProperty("active", "false")
+        self.btn_edit.setProperty("active", "false")
+        _repolish(self.btn_select)
+        _repolish(self.btn_edit)
 
     def show_message(self, text: str) -> None:
         self._clear()
@@ -382,9 +426,15 @@ class TranscriptView(QFrame):
         self._segments = segments
         self._clear()
         self._select_mode = False
+        self._edit_mode = False
         self._selected_ids.clear()
         self.btn_select.setVisible(bool(segments))
         self.btn_assign.setVisible(False)
+        self.btn_edit.setText(self.i18n.t("edit"))
+        self.btn_edit.setProperty("active", "false")
+        self.btn_select.setProperty("active", "false")
+        _repolish(self.btn_edit)
+        _repolish(self.btn_select)
         self._starts = [int(segment["start_ms"]) for segment in segments]
         self.title.setText(job["title"])
 
