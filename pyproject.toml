@@ -1,0 +1,33 @@
+[project]
+name = "whisper-scribe"
+version = "0.1.0"
+description = "Offline Persian audio transcription with speaker labels."
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.8",
+    "Pillow>=11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+ml = [
+    "faster-whisper>=1.1",
+    "ctranslate2>=4.4",
+    "pyannote.audio==4.0.7",
+    "torchcodec==0.17.0",
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "soundfile>=0.12",
+    "numpy>=2.0",
+    "scipy>=1.14",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -35,3 +35,25 @@ Thumbs.db
 # Local env / secrets
 .env
 .env.*
+tokenhg.txt
+*token*.txt
+hf_token*
+
+# Generated assets are committed so a fresh clone runs without the design masters.
+# Regenerate with: python tools/build_assets.py
+
+# Local app data
+data/
+shots/
+*.db
+*.log
+
+# Local models (large, downloaded)
+models/
+
+# Lint / test caches
+.ruff_cache/
+.mypy_cache/
+
+# Downloader logs
+logs/
