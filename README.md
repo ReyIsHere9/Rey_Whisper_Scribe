@@ -147,6 +147,8 @@ Diagnostics for the built EXE:
 
 The windowed EXE writes the result to `selftest.txt`. If it fails before the window appears, check `startup-error.log` next to the EXE.
 
+`build_exe.bat` stages and restores the existing `data`, `models`, `ffmpeg`, and `README.txt` around the rebuild, so transcripts and exports are not erased when you rebuild.
+
 ## Where the models live (and copying to another PC)
 
 Everything stays inside the project folder:
