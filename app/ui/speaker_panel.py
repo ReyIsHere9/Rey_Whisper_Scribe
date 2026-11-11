@@ -36,6 +36,7 @@ def _initials(name: str) -> str:
 class SpeakerRow(QFrame):
     toggled = Signal()
     rename_requested = Signal(int)
+    delete_requested = Signal(int)
 
     def __init__(self, speaker, stats: dict, i18n: I18n, merge_mode: bool, parent=None) -> None:
         super().__init__(parent)
@@ -85,6 +86,15 @@ class SpeakerRow(QFrame):
         )
         layout.addWidget(self.edit_button, 0, Qt.AlignmentFlag.AlignRight)
 
+        self.delete_button = QPushButton("✕")
+        self.delete_button.setObjectName("RowActionDanger")
+        self.delete_button.setToolTip(i18n.t("delete_speaker"))
+        self.delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.delete_button.clicked.connect(
+            lambda: self.delete_requested.emit(self.speaker_id)
+        )
+        layout.addWidget(self.delete_button, 0, Qt.AlignmentFlag.AlignRight)
+
         self._merge_mode = merge_mode
         if merge_mode:
             self._apply_selected(False)
@@ -105,6 +115,7 @@ class SpeakerRow(QFrame):
         self._merge_mode = enabled
         self.check.setVisible(enabled)
         self.edit_button.setVisible(not enabled)
+        self.delete_button.setVisible(not enabled)
         if not enabled:
             self.check.setChecked(False)
 
@@ -122,9 +133,9 @@ class SpeakerRow(QFrame):
 class SpeakerPanel(QFrame):
     merge_requested = Signal(list)
     add_speaker_requested = Signal()
-    enroll_requested = Signal()
     scope_changed = Signal(str)
     renamed = Signal()
+    delete_speaker_requested = Signal(int)
 
     def __init__(self, i18n: I18n, parent=None) -> None:
         super().__init__(parent)
@@ -202,9 +213,6 @@ class SpeakerPanel(QFrame):
 
         actions = QHBoxLayout()
         actions.setSpacing(6)
-        self.btn_enroll = QPushButton()
-        self.btn_enroll.setVisible(False)
-        self.btn_enroll.clicked.connect(self.enroll_requested)
         self.btn_add = QPushButton()
         self.btn_add.setObjectName("Ghost")
         self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -221,7 +229,6 @@ class SpeakerPanel(QFrame):
         self.merge_check.setText(self.i18n.t("merge_mode"))
         self.merge_hint.setText(self.i18n.t("merge_hint"))
         self.btn_merge.setText(self.i18n.t("merge_selected"))
-        self.btn_enroll.setText(self.i18n.t("enroll_voice"))
         self.btn_add.setText(self.i18n.t("add_speaker"))
         self.search.setPlaceholderText(self.i18n.t("search_speakers"))
 
@@ -344,6 +351,7 @@ class SpeakerPanel(QFrame):
                 )
                 row.toggled.connect(self._update_merge_button)
                 row.rename_requested.connect(self._rename_speaker)
+                row.delete_requested.connect(self.delete_speaker_requested)
                 self.rows_layout.insertWidget(self.rows_layout.count() - 1, row)
                 self._rows.append(row)
                 total += 1

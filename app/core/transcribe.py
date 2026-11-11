@@ -106,6 +106,12 @@ class FasterWhisperEngine:
         initial_prompt = (
             PERSIAN_PROMPT if config.language in {"fa", "mixed"} else None
         )
+        custom_prompt = (config.prompt or "").strip()
+        if custom_prompt:
+            initial_prompt = (
+                f"{initial_prompt}\n{custom_prompt}" if initial_prompt else custom_prompt
+            )
+        hotwords = (config.hotwords or "").strip() or None
         raw_segments, info = model.transcribe(
             audio,
             language=language,
@@ -113,9 +119,10 @@ class FasterWhisperEngine:
             beam_size=5,
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 300},
-            condition_on_previous_text=True,
+            condition_on_previous_text=False,
             repetition_penalty=1.05,
             initial_prompt=initial_prompt,
+            hotwords=hotwords,
             word_timestamps=True,
         )
 

@@ -207,8 +207,8 @@ class MainWindow(QMainWindow):
         self.sidebar.nav_changed.connect(self._on_nav)
         self.speakers.merge_requested.connect(self._merge_speakers)
         self.speakers.add_speaker_requested.connect(self._add_speaker)
-        self.speakers.enroll_requested.connect(self._enroll_voice)
         self.speakers.renamed.connect(self._on_speaker_renamed)
+        self.speakers.delete_speaker_requested.connect(self._delete_speaker)
         self.transcript.seeked.connect(self.player.seek_ms)
         self.transcript.text_edited.connect(self._on_text_edited)
         self.transcript.export_requested.connect(self._export)
@@ -503,6 +503,35 @@ class MainWindow(QMainWindow):
             self.i18n.t("assigned_segments").format(count=count, name=display_name), 6000
         )
 
+    def _delete_speaker(self, speaker_id: int) -> None:
+        row = self.db.conn.execute(
+            "SELECT s.name, "
+            "(SELECT COUNT(*) FROM segments seg WHERE seg.speaker_id = s.id) AS n "
+            "FROM speakers s WHERE s.id = ?",
+            (speaker_id,),
+        ).fetchone()
+        if row is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            self.i18n.t("delete_speaker"),
+            self.i18n.t("delete_speaker_confirm").format(
+                name=row["name"], count=row["n"]
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.db.delete_speaker(speaker_id)
+        if self.current_job_id is not None:
+            job = self.db.job(self.current_job_id)
+            if job is not None:
+                self.transcript.load(job, self.db.segments(self.current_job_id))
+        self.speakers.refresh()
+        self._update_counts()
+        self.statusBar().showMessage(self.i18n.t("speaker_deleted"), 5000)
+
     def _on_speaker_renamed(self) -> None:
         if self.current_job_id is None:
             return
@@ -533,11 +562,6 @@ class MainWindow(QMainWindow):
         )
         self.speakers.refresh()
         self._update_counts()
-
-    def _enroll_voice(self) -> None:
-        QMessageBox.information(
-            self, self.i18n.t("enroll_voice"), self.i18n.t("not_implemented")
-        )
 
     def _on_text_edited(self, segment_id: int, text: str) -> None:
         self.db.update_segment_text(segment_id, text)

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     speaker_scope TEXT NOT NULL DEFAULT 'global',
     expected_speakers INTEGER NOT NULL DEFAULT 0,
     diarize INTEGER NOT NULL DEFAULT 1,
+    prompt TEXT NOT NULL DEFAULT '',
+    hotwords TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'queued',
     duration_ms INTEGER NOT NULL DEFAULT 0,
     is_demo INTEGER NOT NULL DEFAULT 0,
@@ -22,7 +24,6 @@ CREATE TABLE IF NOT EXISTS speakers (
     name TEXT NOT NULL,
     color TEXT NOT NULL,
     is_global INTEGER NOT NULL DEFAULT 0,
-    voiceprint TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

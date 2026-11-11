@@ -23,6 +23,10 @@ class Database:
         columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(jobs)")}
         if "diarize" not in columns:
             self.conn.execute("ALTER TABLE jobs ADD COLUMN diarize INTEGER NOT NULL DEFAULT 1")
+        if "prompt" not in columns:
+            self.conn.execute("ALTER TABLE jobs ADD COLUMN prompt TEXT NOT NULL DEFAULT ''")
+        if "hotwords" not in columns:
+            self.conn.execute("ALTER TABLE jobs ADD COLUMN hotwords TEXT NOT NULL DEFAULT ''")
         self.conn.commit()
 
     def close(self) -> None:
@@ -95,11 +99,14 @@ class Database:
         speaker_scope: str = "global",
         expected_speakers: int = 0,
         diarize: bool = True,
+        prompt: str = "",
+        hotwords: str = "",
         status: str = "queued",
     ) -> int:
         cur = self.conn.execute(
             "INSERT INTO jobs(title, source_path, language, model, speaker_scope, "
-            "expected_speakers, diarize, status) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            "expected_speakers, diarize, prompt, hotwords, status) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 title,
                 source_path,
@@ -108,6 +115,8 @@ class Database:
                 speaker_scope,
                 expected_speakers,
                 int(diarize),
+                prompt,
+                hotwords,
                 status,
             ),
         )
@@ -132,13 +141,11 @@ class Database:
         name: str,
         color: str | None = None,
         is_global: bool = False,
-        voiceprint: str | None = None,
     ) -> int:
         count = self.conn.execute("SELECT COUNT(*) AS n FROM speakers").fetchone()["n"]
         cur = self.conn.execute(
-            "INSERT INTO speakers(job_id, name, color, is_global, voiceprint) "
-            "VALUES(?, ?, ?, ?, ?)",
-            (job_id, name, color or speaker_color(count), int(is_global), voiceprint),
+            "INSERT INTO speakers(job_id, name, color, is_global) VALUES(?, ?, ?, ?)",
+            (job_id, name, color or speaker_color(count), int(is_global)),
         )
         self.conn.commit()
         return int(cur.lastrowid)
@@ -147,14 +154,15 @@ class Database:
         self.conn.execute("UPDATE speakers SET name = ? WHERE id = ?", (name, speaker_id))
         self.conn.commit()
 
+    def delete_speaker(self, speaker_id: int) -> None:
+        self.conn.execute("DELETE FROM speakers WHERE id = ?", (speaker_id,))
+        self.conn.commit()
+
     def merge_speakers(self, source_id: int, target_id: int) -> None:
         if source_id == target_id:
             return
         self.conn.execute(
             "UPDATE segments SET speaker_id = ? WHERE speaker_id = ?", (target_id, source_id)
-        )
-        self.conn.execute(
-            "UPDATE speakers SET voiceprint = NULL WHERE id = ?", (source_id,)
         )
         self.conn.execute("DELETE FROM speakers WHERE id = ?", (source_id,))
         self.conn.commit()
@@ -192,7 +200,7 @@ class Database:
             ("آرش", True),
             ("نیلوفر", True),
             ("Sam", True),
-            ("Dr. Rezaei", True),
+            ("کاوه", True),
             ("سارا", True),
             ("Rey", True),
         ]
@@ -221,26 +229,26 @@ class Database:
                 ],
             },
             {
-                "title": "Therapy session — week 12",
+                "title": "Design review — week 12",
                 "language": "fa",
                 "duration_ms": 3_124_000,
                 "created_at": "2026-10-26 17:05:00",
                 "segments": [
-                    (4_100, 12_600, "Dr. Rezaei", "از هفتهٔ گذشته چطور بودی؟ چیزی بود که بخوای درباره‌ش حرف بزنیم؟"),
-                    (13_200, 22_800, "سارا", "راستش خوابم بهتر شده، ولی هنوز صبح‌ها یه فشار مبهم توی سینه دارم."),
-                    (23_400, 29_900, "Dr. Rezaei", "وقتی اون فشار میاد، معمولاً به چی فکر می‌کنی؟"),
-                    (30_500, 41_200, "سارا", "بیشتر دربارهٔ deadline کار. حتی وقتی چیز خاصی نیست، ذهنم می‌ره سمتش."),
+                    (4_100, 12_600, "کاوه", "از جلسهٔ طراحی هفتهٔ گذشته شروع کنیم و بازخورد تیم را مرور کنیم."),
+                    (13_200, 22_800, "سارا", "نسخهٔ جدید رابط کاربری روان‌تر شده، ولی چند جزئیات موبایل مانده است."),
+                    (23_400, 29_900, "کاوه", "برای نسخهٔ بعدی روی دسترسی‌پذیری و سرعت بارگذاری تمرکز کنیم."),
+                    (30_500, 41_200, "سارا", "موافقم. اگر تست‌ها تا پنجشنبه سبز شوند، می‌توانیم منتشر کنیم."),
                 ],
             },
             {
-                "title": "Voice journal — Chapter 3",
+                "title": "Project notes — Part 3",
                 "language": "fa",
                 "duration_ms": 612_000,
                 "created_at": "2026-10-24 22:14:00",
                 "segments": [
-                    (1_200, 9_800, "Rey", "امشب دربارهٔ فصل سوم «عادت‌های اتمی» حرف می‌زنم."),
-                    (10_400, 20_100, "Rey", "نکتهٔ اصلی این فصل اینه که هویت از تکرار ساخته می‌شه، نه از تصمیم."),
-                    (20_900, 34_500, "Rey", "و یه جملهٔ انگلیسی که خیلی بهم چسبید: every action is a vote for the person you wish to become."),
+                    (1_200, 9_800, "Rey", "امشب دربارهٔ بخش سوم یادداشت‌های پروژه صحبت می‌کنم."),
+                    (10_400, 20_100, "Rey", "نکتهٔ اصلی این بخش این است که پیشرفت از تکرار کارهای کوچک ساخته می‌شود."),
+                    (20_900, 34_500, "Rey", "و یک جملهٔ انگلیسی که برایم مهم بود: consistency beats intensity."),
                 ],
             },
         ]

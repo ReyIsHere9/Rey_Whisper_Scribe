@@ -322,6 +322,23 @@ QPushButton#RowAction:hover {
     border-color: $border;
     color: $accent;
 }
+QPushButton#RowActionDanger {
+    background: transparent;
+    border: 1px solid transparent;
+    color: $text_muted;
+    padding: 0px;
+    min-height: 22px;
+    max-height: 22px;
+    min-width: 24px;
+    max-width: 24px;
+    border-radius: 5px;
+    font-size: 12px;
+}
+QPushButton#RowActionDanger:hover {
+    background: $panel_alt;
+    border-color: $accent;
+    color: $accent;
+}
 
 QPushButton[variant="header"] {
     background: rgba(255, 255, 255, 0.06);

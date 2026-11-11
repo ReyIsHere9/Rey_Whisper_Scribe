@@ -100,6 +100,16 @@ class JobDialog(QDialog):
         self.expected.setSpecialValueText(i18n.t("auto_speakers"))
         self.expected.setFixedWidth(120)
         advanced_layout.addWidget(self.expected)
+
+        advanced_layout.addWidget(self._eyebrow(i18n.t("custom_context")))
+        self.context = QLineEdit()
+        self.context.setPlaceholderText(i18n.t("context_hint"))
+        advanced_layout.addWidget(self.context)
+
+        advanced_layout.addWidget(self._eyebrow(i18n.t("vocabulary")))
+        self.vocabulary = QLineEdit()
+        self.vocabulary.setPlaceholderText(i18n.t("vocabulary_hint"))
+        advanced_layout.addWidget(self.vocabulary)
         self.advanced_box.setVisible(False)
         self.advanced_toggle.toggled.connect(self.advanced_box.setVisible)
         layout.addWidget(self.advanced_box)
@@ -167,6 +177,8 @@ class JobDialog(QDialog):
             speaker_scope=self.scope.currentData(),
             expected_speakers=self.expected.value() if self.diarize.isChecked() else 0,
             diarize=self.diarize.isChecked(),
+            prompt=self.context.text().strip(),
+            hotwords=self.vocabulary.text().strip(),
             status="queued",
         )
         self.accept()

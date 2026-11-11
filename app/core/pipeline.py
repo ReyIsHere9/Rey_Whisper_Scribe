@@ -70,6 +70,8 @@ def run_job(
         diarize=bool(job["diarize"]),
         expected_speakers=job["expected_speakers"],
         speaker_scope=job["speaker_scope"],
+        prompt=job["prompt"],
+        hotwords=job["hotwords"],
     )
 
     db.set_job_status(job_id, "processing")

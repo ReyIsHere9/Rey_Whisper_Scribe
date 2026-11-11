@@ -66,6 +66,8 @@ def extract_audio(source: str | Path, destination: str | Path, sample_rate: int 
         command,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         creationflags=_CREATE_NO_WINDOW,
         check=False,
     )
@@ -92,6 +94,8 @@ def probe_duration_ms(path: str | Path, fallback: int = 0) -> int:
         command,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         creationflags=_CREATE_NO_WINDOW,
         check=False,
     )

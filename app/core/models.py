@@ -18,6 +18,8 @@ class JobConfig:
     diarize: bool = True
     expected_speakers: int = 0
     speaker_scope: SpeakerScope = "global"
+    prompt: str = ""
+    hotwords: str = ""
     device: str = "auto"
 
 
