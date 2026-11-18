@@ -73,9 +73,23 @@ def _selftest(audio: str, output: str) -> int:
             lines.append(f"segments: {len(rows)}")
             for row in rows:
                 lines.append(f"{row['speaker_name']}: {row['text']}")
+
+            try:
+                from app.core.spellcheck import SpellChecker
+
+                sample, sample_edits = SpellChecker().check("جلسه در چارم آوریل")
+                lines.append(f"spellcheck: {sample}")
+                if "چهارم آوریل" not in sample:
+                    code = 3
+                else:
+                    code = 0 if rows else 1
+                lines.append(f"spellcheck_edits: {len(sample_edits)}")
+            except Exception as error:  # noqa: BLE001 - report frozen asset/dependency issues
+                lines.append(f"spellcheck failed: {error}")
+                code = 3
+
             db.close()
             db = None
-            code = 0 if rows else 1
     except Exception:  # noqa: BLE001 - write the traceback for windowed builds
         lines.append(traceback.format_exc())
         code = 2
