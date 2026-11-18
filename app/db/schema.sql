@@ -42,5 +42,19 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS spell_edits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    segment_id INTEGER NOT NULL REFERENCES segments(id) ON DELETE CASCADE,
+    start_char INTEGER NOT NULL,
+    end_char INTEGER NOT NULL,
+    original TEXT NOT NULL,
+    replacement TEXT NOT NULL,
+    source TEXT NOT NULL,
+    confidence REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_spell_edits_job ON spell_edits(job_id);
+
 CREATE INDEX IF NOT EXISTS idx_segments_job ON segments(job_id, start_ms);
 CREATE INDEX IF NOT EXISTS idx_speakers_job ON speakers(job_id);

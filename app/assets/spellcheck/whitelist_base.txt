@@ -1,0 +1,3 @@
+# One protected term or phrase per line.
+# Turkish/Arabic variants are normalized before matching.
+# English words, numbers, and URLs are protected automatically.

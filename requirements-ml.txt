@@ -11,3 +11,6 @@ torchcodec==0.17.0
 soundfile>=0.12
 numpy>=2.0
 scipy>=1.14
+
+spylls>=0.1.7
+symspellpy>=6.10.2

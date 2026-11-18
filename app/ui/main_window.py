@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QStackedWidget,
@@ -580,6 +581,9 @@ class MainWindow(QMainWindow):
         source_action = None
         if job["source_path"] and Path(job["source_path"]).exists():
             source_action = menu.addAction(self.i18n.t("reveal_source"))
+        spelling_action = None
+        if self.db.spell_edits(job_id):
+            spelling_action = menu.addAction(self.i18n.t("spelling_corrections"))
         menu.addSeparator()
         delete_action = menu.addAction(self.i18n.t("delete_job"))
         chosen = menu.exec(position)
@@ -591,8 +595,37 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(
                 QUrl.fromLocalFile(str(Path(job["source_path"]).parent))
             )
+        elif spelling_action is not None and chosen is spelling_action:
+            self._spelling_report(job_id)
         elif chosen is delete_action:
             self._delete_job(job_id, job["title"])
+
+    def _spelling_report(self, job_id: int) -> None:
+        edits = self.db.spell_edits(job_id)
+        if not edits:
+            QMessageBox.information(
+                self, self.i18n.t("spelling_corrections"), self.i18n.t("no_corrections")
+            )
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.i18n.t("spelling_corrections"))
+        dialog.resize(820, 560)
+        layout = QVBoxLayout(dialog)
+        view = QPlainTextEdit()
+        view.setReadOnly(True)
+        view.setPlainText(
+            "\n".join(
+                f"[{format_clock(row['start_ms'])}] "
+                f"{row['original']} → {row['replacement']}  [{row['source']}]"
+                for row in edits
+            )
+        )
+        layout.addWidget(view)
+        close = QPushButton(self.i18n.t("done"))
+        close.setObjectName("Primary")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close, 0, Qt.AlignmentFlag.AlignRight)
+        dialog.exec()
 
     def _rename_job(self, job_id: int, current_title: str) -> None:
         title, accepted = QInputDialog.getText(

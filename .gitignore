@@ -60,3 +60,9 @@ startup-error.log
 
 # Downloader logs
 logs/
+
+# Experimental local proofreading (not part of the app)
+tools/PROOFREADING.md
+tools/bench_ollama.py
+tools/proofread_ollama.py
+tools/proofread_ollama_edits.py

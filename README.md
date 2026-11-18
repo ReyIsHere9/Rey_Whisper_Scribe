@@ -16,7 +16,8 @@ Whisper Scribe is a local Windows desktop application for transcribing Persian, 
 - Single-click transcript editing, click-to-seek playback, and TXT/SRT export
 - Transcript search, sorting, rename, delete, export, and reveal-source actions
 - Optional per-job context and vocabulary fields for domain-specific terms and names
-- Settings for theme, interface language, and new-job defaults
+- Offline Persian spelling and date correction with Hunspell, SymSpell, and protected words
+- Settings for theme, interface language, protected words, and new-job defaults
 - Live progress, elapsed time, cancellation, and English/Persian RTL UI
 - Offline operation after model installation; local database and exports
 
@@ -198,12 +199,25 @@ For domain-specific content, open **Advanced** in the New Transcription dialog a
 
 These fields bias decoding toward the supplied terms. Large-v3 remains the default and most accurate bundled model; custom vocabulary is the recommended way to improve domain-specific spelling.
 
+### Offline spelling and date rules
+
+After transcription, Whisper Scribe runs a local deterministic correction pass:
+
+- **Lilak** Persian Hunspell dictionary for word validity and morphology
+- **SymSpell** with a Persian frequency list for one-letter and spacing candidates
+- General **date rules** for Solar Hijri months and Persian-written Gregorian months (`ژانویه`, `فوریه`, `مارس`, `آوریل`, `مه`, `ژوئن`, `ژوئیه`, `اوت`, `سپتامبر`, `اکتبر`, `نوامبر`, `دسامبر`, plus common aliases such as `جنوری`, `فبروری`, `مارچ`, `اپریل`, `جون`, `جولای`, `اگوست`, `سپتمبر`, `اکتوبر`, `نومبر`)
+- **Protected words / names** from Settings, plus names, English words, numbers, and URLs protected by default
+- Corrections are logged; open the transcript’s `⋯` menu and choose **Spelling corrections** to inspect them
+
+The pass is conservative: it applies high-confidence date and unambiguous dictionary corrections and never calls a cloud or local HTTP API. Hunspell, SymSpell, and the rule data are bundled with the app.
+
 ### Settings
 
 Click **Settings** in the sidebar to change:
 
 - Theme and interface language
 - Default language, model, expected speakers, speaker scope, and diarization
+- Protected words / names used by the offline spelling pass
 - Open the models or data folders
 
 ## Troubleshooting
@@ -274,5 +288,7 @@ docs/         README screenshots
 - [pyannote.audio](https://github.com/pyannote/pyannote-audio)
 - [PySide6 / Qt for Python](https://doc.qt.io/qtforpython/)
 - [Vazirmatn font](https://github.com/rastikerdar/vazirmatn) (SIL Open Font License)
+- [Lilak Persian Hunspell dictionary](https://github.com/b00f/lilak) (Apache-2.0)
+- [Persian SymSpell frequency data](https://github.com/pooya-mohammadi/persian-spell-checker-kenlm)
 - [FFmpeg](https://ffmpeg.org/)
 - Branding and visual design: Rey

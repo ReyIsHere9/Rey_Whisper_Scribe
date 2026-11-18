@@ -9,6 +9,7 @@ from app.core.audio import extract_audio, probe_duration_ms
 from app.core.diarize import DiarizationUnavailable, diarize
 from app.core.models import JobCancelled, JobConfig, Segment, SpeakerTurn
 from app.core.speakers import display_label
+from app.core.spellcheck import SpellcheckUnavailable, apply_spellcheck
 from app.core.transcribe import FasterWhisperEngine
 
 Progress = Callable[[float, str, int], None]
@@ -143,6 +144,13 @@ def run_job(
                         (speaker_id, segment_id),
                     )
                 db.conn.commit()
+
+        stage(0.97, "spelling")
+        check()
+        try:
+            apply_spellcheck(db, job_id, db.setting("protected_words", ""))
+        except SpellcheckUnavailable:
+            pass
 
         db.conn.execute(
             "UPDATE jobs SET status = 'transcribed', duration_ms = ? WHERE id = ?",

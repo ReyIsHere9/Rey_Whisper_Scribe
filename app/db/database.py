@@ -183,6 +183,16 @@ class Database:
         self.conn.execute("UPDATE segments SET text = ? WHERE id = ?", (text, segment_id))
         self.conn.commit()
 
+    def spell_edits(self, job_id: int) -> list[sqlite3.Row]:
+        return list(
+            self.conn.execute(
+                "SELECT se.*, s.start_ms FROM spell_edits se "
+                "JOIN segments s ON s.id = se.segment_id "
+                "WHERE se.job_id = ? ORDER BY s.start_ms, se.start_char",
+                (job_id,),
+            )
+        )
+
     def counts(self) -> dict[str, int]:
         jobs = self.conn.execute("SELECT COUNT(*) AS n FROM jobs").fetchone()["n"]
         speakers = self.conn.execute("SELECT COUNT(*) AS n FROM speakers").fetchone()["n"]

@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import traceback
+from contextlib import suppress
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
@@ -37,6 +38,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _selftest(audio: str, output: str) -> int:
     lines: list[str] = []
+    db = None
     try:
         with tempfile.TemporaryDirectory(prefix="whisper-scribe-selftest-") as temp:
             os.environ["WHISPERSCRIBE_DATA"] = temp
@@ -72,10 +74,15 @@ def _selftest(audio: str, output: str) -> int:
             for row in rows:
                 lines.append(f"{row['speaker_name']}: {row['text']}")
             db.close()
+            db = None
             code = 0 if rows else 1
     except Exception:  # noqa: BLE001 - write the traceback for windowed builds
         lines.append(traceback.format_exc())
         code = 2
+    finally:
+        if db is not None:
+            with suppress(Exception):
+                db.close()
 
     text = "\n".join(lines)
     if output:

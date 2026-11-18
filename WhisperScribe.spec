@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -32,6 +32,10 @@ hiddenimports = [
     "yaml",
     "tqdm",
     "rich",
+    "spylls",
+    "spylls.hunspell",
+    "symspellpy",
+    "editdistpy",
 ]
 
 PACKAGES = [
@@ -57,6 +61,9 @@ PACKAGES = [
     "asteroid_filterbanks",
     "safetensors",
     "tokenizers",
+    "spylls",
+    "symspellpy",
+    "editdistpy",
 ]
 
 for package in PACKAGES:
@@ -117,3 +124,4 @@ coll = COLLECT(
     upx=False,
     name="WhisperScribe",
 )
+

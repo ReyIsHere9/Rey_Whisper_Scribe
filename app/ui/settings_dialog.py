@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -30,7 +31,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle(i18n.t("settings"))
         self.setModal(True)
         self.setMinimumWidth(620)
-        self.resize(660, 560)
+        self.resize(660, 720)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 22, 24, 18)
@@ -130,6 +131,21 @@ class SettingsDialog(QDialog):
         storage_grid.addWidget(data_open, 1, 2)
         layout.addWidget(storage)
 
+        spelling = QGroupBox(i18n.t("spelling"))
+        spelling_layout = QVBoxLayout(spelling)
+        protected_label = QLabel(i18n.t("protected_words"))
+        spelling_layout.addWidget(protected_label)
+        self.protected = QPlainTextEdit()
+        self.protected.setPlaceholderText(i18n.t("protected_hint"))
+        self.protected.setFixedHeight(92)
+        self.protected.setPlainText(db.setting("protected_words", ""))
+        spelling_layout.addWidget(self.protected)
+        hint = QLabel(i18n.t("protected_hint"))
+        hint.setObjectName("Muted")
+        hint.setWordWrap(True)
+        spelling_layout.addWidget(hint)
+        layout.addWidget(spelling)
+
         layout.addStretch(1)
         version = QLabel("Whisper Scribe 0.1.0")
         version.setObjectName("Muted")
@@ -165,4 +181,5 @@ class SettingsDialog(QDialog):
         )
         self.db.set_setting("default_scope", str(self.scope.currentData()))
         self.db.set_setting("default_diarize", "1" if self.diarize.isChecked() else "0")
+        self.db.set_setting("protected_words", self.protected.toPlainText().strip())
         self.accept()
