@@ -84,6 +84,10 @@ def _selftest(audio: str, output: str) -> int:
                 else:
                     code = 0 if rows else 1
                 lines.append(f"spellcheck_edits: {len(sample_edits)}")
+                suggestions = SpellChecker().suggestions("تست های دکتوری سال")
+                lines.append(f"spellcheck_suggestions: {len(suggestions)}")
+                if not suggestions:
+                    code = 3
             except Exception as error:  # noqa: BLE001 - report frozen asset/dependency issues
                 lines.append(f"spellcheck failed: {error}")
                 code = 3

@@ -4,7 +4,7 @@ import importlib.util
 import json
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.normalize_fa import has_persian, normalize_persian
@@ -46,6 +46,7 @@ class TextEdit:
     replacement: str
     source: str
     confidence: float
+    alternatives: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -195,7 +196,9 @@ class SpellChecker:
             return True
         return normalize_persian(token.text) in self.protected
 
-    def _suggestions(self, word: str) -> tuple[str, float] | None:
+    def _candidates(
+        self, word: str, include_shorter: bool = False
+    ) -> list[tuple[str, int, int, int]]:
         normalized = normalize_persian(word)
         candidates: dict[str, tuple[int, int, int]] = {}
 
@@ -225,9 +228,6 @@ class SpellChecker:
                 item.count if previous is None else max(previous[2], item.count),
             )
 
-        if not candidates:
-            return None
-
         ranked = sorted(
             candidates.items(),
             key=lambda item: (
@@ -237,19 +237,30 @@ class SpellChecker:
                 len(item[0]),
             ),
         )
+        return [
+            (candidate, distance, sources, count)
+            for candidate, (distance, sources, count) in ranked
+            if candidate != normalized
+            and (
+                len(candidate) >= len(normalized)
+                or (
+                    include_shorter
+                    and candidate
+                    and normalized
+                    and candidate[0] == normalized[0]
+                )
+            )
+        ]
+
+    def _suggestions(self, word: str) -> tuple[str, float] | None:
+        ranked = self._candidates(word)
         if not ranked:
             return None
-        best_distance = ranked[0][1][0]
-        best = [
-            item
-            for item in ranked
-            if item[1][0] == best_distance
-            and item[0] != normalized
-            and len(item[0]) >= len(normalized)
-        ]
+        best_distance = ranked[0][1]
+        best = [item for item in ranked if item[1] == best_distance]
         if len(best) != 1:
             return None
-        candidate, (distance, sources, _count) = best[0]
+        candidate, distance, sources, _count = best[0]
         if sources < 2 and distance > 1:
             return None
         if distance == 1:
@@ -259,6 +270,42 @@ class SpellChecker:
         else:
             return None
         return (candidate, confidence) if confidence >= self.min_auto else None
+
+    def suggestions(self, text: str) -> list[TextEdit]:
+        edits: list[TextEdit] = []
+        for token in self._tokens(text):
+            if not has_persian(token.text) or self._protected(token):
+                continue
+            normalized = normalize_persian(token.text)
+            if not normalized or self.hunspell.lookup(normalized):
+                continue
+            month = self._match_month(token.text)
+            if month is not None and month[1] == 0:
+                continue
+            ranked = self._candidates(token.text, include_shorter=True)
+            ranked.sort(
+                key=lambda item: (item[1], -(item[3] or 0), -item[2], len(item[0]))
+            )
+            alternatives: list[str] = []
+            for candidate, _distance, _sources, _count in ranked:
+                if candidate not in alternatives:
+                    alternatives.append(candidate)
+                if len(alternatives) >= 6:
+                    break
+            if not alternatives:
+                continue
+            edits.append(
+                TextEdit(
+                    start=token.start,
+                    end=token.end,
+                    original=token.text,
+                    replacement=alternatives[0],
+                    source="suggestion",
+                    confidence=0.55,
+                    alternatives=alternatives,
+                )
+            )
+        return edits
 
     def check(self, text: str) -> tuple[str, list[TextEdit]]:
         tokens = self._tokens(text)
@@ -371,24 +418,42 @@ def apply_spellcheck(db: Any, job_id: int, protected_words: Iterable[str] = ()) 
     total = 0
     for segment in db.segments(job_id):
         corrected, edits = checker.check(segment["text"])
-        if not edits:
-            continue
-        db.conn.execute(
-            "UPDATE segments SET text = ? WHERE id = ?", (corrected, segment["id"])
-        )
-        for edit in edits:
+        if edits:
+            db.conn.execute(
+                "UPDATE segments SET text = ? WHERE id = ?",
+                (corrected, segment["id"]),
+            )
+            for edit in edits:
+                db.conn.execute(
+                    "INSERT INTO spell_edits(job_id, segment_id, start_char, end_char, "
+                    "original, replacement, source, confidence, status, alternatives) "
+                    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, 'applied', '[]')",
+                    (
+                        job_id,
+                        segment["id"],
+                        edit.start,
+                        edit.end,
+                        edit.original,
+                        edit.replacement,
+                        edit.source,
+                        edit.confidence,
+                    ),
+                )
+
+        for suggestion in checker.suggestions(corrected):
             db.conn.execute(
                 "INSERT INTO spell_edits(job_id, segment_id, start_char, end_char, "
-                "original, replacement, source, confidence) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                "original, replacement, source, confidence, status, alternatives) "
+                "VALUES(?, ?, ?, ?, ?, ?, 'suggestion', ?, 'suggested', ?)",
                 (
                     job_id,
                     segment["id"],
-                    edit.start,
-                    edit.end,
-                    edit.original,
-                    edit.replacement,
-                    edit.source,
-                    edit.confidence,
+                    suggestion.start,
+                    suggestion.end,
+                    suggestion.original,
+                    suggestion.replacement,
+                    suggestion.confidence,
+                    json.dumps(suggestion.alternatives, ensure_ascii=False),
                 ),
             )
         total += len(edits)

@@ -207,9 +207,10 @@ After transcription, Whisper Scribe runs a local deterministic correction pass:
 - **SymSpell** with a Persian frequency list for one-letter and spacing candidates
 - General **date rules** for Solar Hijri months and Persian-written Gregorian months (`ژانویه`, `فوریه`, `مارس`, `آوریل`, `مه`, `ژوئن`, `ژوئیه`, `اوت`, `سپتامبر`, `اکتبر`, `نوامبر`, `دسامبر`, plus common aliases such as `جنوری`, `فبروری`, `مارچ`, `اپریل`, `جون`, `جولای`, `اگوست`, `سپتمبر`, `اکتوبر`, `نومبر`)
 - **Protected words / names** from Settings, plus names, English words, numbers, and URLs protected by default
-- Corrections are logged; open the transcript’s `⋯` menu and choose **Spelling corrections** to inspect them
+- **Review suggestions**: ambiguous words are highlighted in rose with a **Review spelling (N)** button; choose a candidate or keep the original
+- Corrections are logged; open the transcript’s `⋯` menu and choose **Spelling corrections** to inspect applied changes
 
-The pass is conservative: it applies high-confidence date and unambiguous dictionary corrections and never calls a cloud or local HTTP API. Hunspell, SymSpell, and the rule data are bundled with the app.
+The pass is conservative: it applies high-confidence date and unambiguous dictionary corrections automatically. Ambiguous dictionary candidates are proposed for review instead of being changed, and the pass never calls a cloud or local HTTP API. Hunspell, SymSpell, and the rule data are bundled with the app.
 
 ### Settings
 

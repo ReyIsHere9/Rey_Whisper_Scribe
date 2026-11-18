@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import bisect
+import html
+import json
 import re
 
 from PySide6.QtCore import Qt, Signal
@@ -42,12 +44,13 @@ class SegmentCard(QFrame):
     text_edited = Signal(int, str)
     selection_toggled = Signal(int, bool)
 
-    def __init__(self, segment, i18n: I18n, parent=None) -> None:
+    def __init__(self, segment, i18n: I18n, suggestions=None, parent=None) -> None:
         super().__init__(parent)
         self.i18n = i18n
         self.segment_id = int(segment["id"])
         self.start_ms = int(segment["start_ms"])
         self._text = segment["text"] or ""
+        self._suggestions = list(suggestions or [])
         self._edit_mode = False
         self._select_mode = False
         self._selected = False
@@ -87,11 +90,21 @@ class SegmentCard(QFrame):
         head.addStretch(1)
         body.addLayout(head)
 
-        self.text_label = QLabel(self._text)
+        self.text_label = QLabel()
         self.text_label.setObjectName("SegText")
         self.text_label.setWordWrap(True)
         self.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        _apply_direction(self.text_label, self._text)
+        self._set_label_text()
+        if self._suggestions:
+            self.text_label.setToolTip(
+                "\n".join(
+                    f"{suggestion['original']} → "
+                    + ", ".join(
+                        json.loads(suggestion["alternatives"] or "[]")[:5]
+                    )
+                    for suggestion in self._suggestions
+                )
+            )
         body.addWidget(self.text_label)
 
         self.editor = QLineEdit(self._text)
@@ -100,6 +113,35 @@ class SegmentCard(QFrame):
         body.addWidget(self.editor)
 
         layout.addLayout(body, 1)
+
+    def _set_label_text(self) -> None:
+        if not self._suggestions:
+            self.text_label.setTextFormat(Qt.TextFormat.PlainText)
+            self.text_label.setText(self._text)
+            _apply_direction(self.text_label, self._text)
+            return
+
+        pieces: list[str] = []
+        cursor = 0
+        for suggestion in sorted(
+            self._suggestions, key=lambda item: int(item["start_char"])
+        ):
+            start = int(suggestion["start_char"])
+            end = int(suggestion["end_char"])
+            if start < cursor or end > len(self._text) or start >= end:
+                continue
+            pieces.append(html.escape(self._text[cursor:start]))
+            pieces.append(
+                '<span style="background-color: #F0C9C4; color: #3A0D0D; '
+                'border-bottom: 1px solid #B3261E;">'
+                + html.escape(self._text[start:end])
+                + "</span>"
+            )
+            cursor = end
+        pieces.append(html.escape(self._text[cursor:]))
+        self.text_label.setTextFormat(Qt.TextFormat.RichText)
+        self.text_label.setText("".join(pieces).replace("\n", "<br>"))
+        _apply_direction(self.text_label, self._text)
 
     def _set_active(self, active: bool) -> None:
         if self._active == active:
@@ -190,8 +232,8 @@ class SegmentCard(QFrame):
         value = self.editor.text().strip()
         if value and value != self._text:
             self._text = value
-            self.text_label.setText(value)
-            _apply_direction(self.text_label, value)
+            self._suggestions.clear()
+            self._set_label_text()
             self.text_edited.emit(self.segment_id, value)
         self._stop_edit()
 
@@ -210,6 +252,7 @@ class TranscriptView(QFrame):
     seeked = Signal(int)
     text_edited = Signal(int, str)
     assign_requested = Signal(list)
+    review_spelling = Signal()
 
     def __init__(self, i18n: I18n, parent=None) -> None:
         super().__init__(parent)
@@ -221,6 +264,7 @@ class TranscriptView(QFrame):
         self._selected_ids: set[int] = set()
         self._job = None
         self._segments = []
+        self._suggestions: dict[int, list] = {}
         self._starts: list[int] = []
         self._active_index = -1
         self._message_label: QLabel | None = None
@@ -264,6 +308,13 @@ class TranscriptView(QFrame):
         self.btn_assign.setEnabled(False)
         self.btn_assign.clicked.connect(self._request_assign)
         top.addWidget(self.btn_assign, 0, Qt.AlignmentFlag.AlignBottom)
+
+        self.btn_spell = QPushButton()
+        self.btn_spell.setObjectName("Ghost")
+        self.btn_spell.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_spell.setVisible(False)
+        self.btn_spell.clicked.connect(self.review_spelling)
+        top.addWidget(self.btn_spell, 0, Qt.AlignmentFlag.AlignBottom)
 
         self.btn_export = QPushButton()
         self.btn_export.setObjectName("Primary")
@@ -314,11 +365,16 @@ class TranscriptView(QFrame):
             self.i18n.t("done") if self._select_mode else self.i18n.t("select")
         )
         self.btn_select.setToolTip(self.i18n.t("select_hint"))
+        self.btn_spell.setText(
+            self.i18n.t("review_spelling").format(
+                count=sum(len(items) for items in self._suggestions.values())
+            )
+        )
         self.btn_export.setText(self.i18n.t("export"))
         self._update_select_texts()
         self._update_hint()
         if self._job is not None:
-            self.load(self._job, self._segments)
+            self.load(self._job, self._segments, self._suggestions)
 
     def _update_hint(self) -> None:
         if self._select_mode:
@@ -362,6 +418,8 @@ class TranscriptView(QFrame):
             card.set_select_mode(enabled)
             card.set_selected(False)
         self.btn_assign.setVisible(enabled)
+        pending = sum(len(items) for items in self._suggestions.values())
+        self.btn_spell.setVisible(not enabled and pending > 0)
         self._update_select_texts()
         self._update_hint()
 
@@ -401,6 +459,7 @@ class TranscriptView(QFrame):
         self._select_mode = False
         self._selected_ids.clear()
         self.btn_assign.setVisible(False)
+        self.btn_spell.setVisible(False)
         self.hint.setVisible(False)
         self.btn_select.setProperty("active", "false")
         self.btn_edit.setProperty("active", "false")
@@ -421,13 +480,19 @@ class TranscriptView(QFrame):
         if self._message_label is not None:
             self._message_label.setText(text)
 
-    def load(self, job, segments) -> None:
+    def load(self, job, segments, suggestions=None) -> None:
         self._job = job
         self._segments = segments
+        self._suggestions = suggestions or {}
         self._clear()
         self._select_mode = False
         self._edit_mode = False
         self._selected_ids.clear()
+        pending = sum(len(items) for items in self._suggestions.values())
+        self.btn_spell.setText(
+            self.i18n.t("review_spelling").format(count=pending)
+        )
+        self.btn_spell.setVisible(pending > 0)
         self.btn_select.setVisible(bool(segments))
         self.btn_assign.setVisible(False)
         self.btn_edit.setText(self.i18n.t("edit"))
@@ -469,7 +534,11 @@ class TranscriptView(QFrame):
             return
 
         for segment in segments:
-            card = SegmentCard(segment, self.i18n)
+            card = SegmentCard(
+                segment,
+                self.i18n,
+                self._suggestions.get(int(segment["id"]), []),
+            )
             card.seeked.connect(self.seeked)
             card.text_edited.connect(self.text_edited)
             card.selection_toggled.connect(self._on_selection_toggled)

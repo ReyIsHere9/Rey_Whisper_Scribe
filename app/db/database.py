@@ -27,6 +27,17 @@ class Database:
             self.conn.execute("ALTER TABLE jobs ADD COLUMN prompt TEXT NOT NULL DEFAULT ''")
         if "hotwords" not in columns:
             self.conn.execute("ALTER TABLE jobs ADD COLUMN hotwords TEXT NOT NULL DEFAULT ''")
+        edit_columns = {
+            row["name"] for row in self.conn.execute("PRAGMA table_info(spell_edits)")
+        }
+        if "status" not in edit_columns:
+            self.conn.execute(
+                "ALTER TABLE spell_edits ADD COLUMN status TEXT NOT NULL DEFAULT 'applied'"
+            )
+        if "alternatives" not in edit_columns:
+            self.conn.execute(
+                "ALTER TABLE spell_edits ADD COLUMN alternatives TEXT NOT NULL DEFAULT '[]'"
+            )
         self.conn.commit()
 
     def close(self) -> None:
@@ -183,15 +194,74 @@ class Database:
         self.conn.execute("UPDATE segments SET text = ? WHERE id = ?", (text, segment_id))
         self.conn.commit()
 
-    def spell_edits(self, job_id: int) -> list[sqlite3.Row]:
+    def spell_edits(self, job_id: int, status: str = "applied") -> list[sqlite3.Row]:
         return list(
             self.conn.execute(
-                "SELECT se.*, s.start_ms FROM spell_edits se "
+                "SELECT se.*, s.start_ms, s.text AS segment_text FROM spell_edits se "
                 "JOIN segments s ON s.id = se.segment_id "
-                "WHERE se.job_id = ? ORDER BY s.start_ms, se.start_char",
-                (job_id,),
+                "WHERE se.job_id = ? AND se.status = ? "
+                "ORDER BY s.start_ms, se.start_char",
+                (job_id, status),
             )
         )
+
+    def spell_suggestions(self, job_id: int) -> list[sqlite3.Row]:
+        return self.spell_edits(job_id, status="suggested")
+
+    def apply_spell_suggestions(self, job_id: int, choices: dict[int, str]) -> int:
+        suggestions = {int(row["id"]): row for row in self.spell_suggestions(job_id)}
+        if not suggestions:
+            return 0
+        by_segment: dict[int, list[tuple[int, int, int, str]]] = {}
+        for edit_id, replacement in choices.items():
+            row = suggestions.get(int(edit_id))
+            if row is None or not replacement:
+                continue
+            by_segment.setdefault(int(row["segment_id"]), []).append(
+                (
+                    int(row["start_char"]),
+                    int(row["end_char"]),
+                    int(edit_id),
+                    replacement,
+                )
+            )
+
+        applied = 0
+        for segment_id, edits in by_segment.items():
+            segment = self.conn.execute(
+                "SELECT text FROM segments WHERE id = ?", (segment_id,)
+            ).fetchone()
+            if segment is None:
+                continue
+            text = segment["text"]
+            for start, end, edit_id, replacement in sorted(
+                edits, key=lambda item: item[0], reverse=True
+            ):
+                text = text[:start] + replacement + text[end:]
+                self.conn.execute(
+                    "UPDATE spell_edits SET status = 'applied', source = 'review', "
+                    "replacement = ? WHERE id = ?",
+                    (replacement, edit_id),
+                )
+                applied += 1
+            self.conn.execute(
+                "UPDATE segments SET text = ? WHERE id = ?", (text, segment_id)
+            )
+
+        self.conn.execute(
+            "UPDATE spell_edits SET status = 'ignored' "
+            "WHERE job_id = ? AND status = 'suggested'",
+            (job_id,),
+        )
+        self.conn.commit()
+        return applied
+
+    def delete_pending_for_segment(self, segment_id: int) -> None:
+        self.conn.execute(
+            "DELETE FROM spell_edits WHERE segment_id = ? AND status = 'suggested'",
+            (segment_id,),
+        )
+        self.conn.commit()
 
     def counts(self) -> dict[str, int]:
         jobs = self.conn.execute("SELECT COUNT(*) AS n FROM jobs").fetchone()["n"]

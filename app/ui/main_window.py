@@ -39,6 +39,7 @@ from app.ui.player import PlayerBar
 from app.ui.settings_dialog import SettingsDialog
 from app.ui.sidebar import Sidebar
 from app.ui.speaker_panel import SpeakerPanel
+from app.ui.spelling_dialog import SpellingReviewDialog
 from app.ui.transcript import TranscriptView
 from app.ui.widgets import Divider, Ornament, TextureFrame, format_clock
 from app.ui.worker import PipelineWorker
@@ -212,6 +213,7 @@ class MainWindow(QMainWindow):
         self.speakers.delete_speaker_requested.connect(self._delete_speaker)
         self.transcript.seeked.connect(self.player.seek_ms)
         self.transcript.text_edited.connect(self._on_text_edited)
+        self.transcript.review_spelling.connect(self._review_spelling)
         self.transcript.export_requested.connect(self._export)
         self.transcript.assign_requested.connect(self._assign_segments)
         self.player.position_changed.connect(self.transcript.set_active_ms)
@@ -288,7 +290,7 @@ class MainWindow(QMainWindow):
         try:
             self.current_job_id = job_id
             segments = self.db.segments(job_id)
-            self.transcript.load(job, segments)
+            self.transcript.load(job, segments, self._suggestions_for(job_id))
             self.speakers.set_job(job_id, self.db)
             self.player.set_job(job)
             self.sidebar.refresh_jobs(self.db.jobs(), job_id)
@@ -564,12 +566,32 @@ class MainWindow(QMainWindow):
         self.speakers.refresh()
         self._update_counts()
 
+    def _suggestions_for(self, job_id: int) -> dict[int, list]:
+        suggestions: dict[int, list] = {}
+        for row in self.db.spell_suggestions(job_id):
+            suggestions.setdefault(int(row["segment_id"]), []).append(row)
+        return suggestions
+
     def _on_text_edited(self, segment_id: int, text: str) -> None:
         self.db.update_segment_text(segment_id, text)
+        self.db.delete_pending_for_segment(segment_id)
         if self.current_job_id is not None:
             job = self.db.job(self.current_job_id)
             if job is not None:
-                self.transcript.load(job, self.db.segments(self.current_job_id))
+                self.transcript.load(
+                    job,
+                    self.db.segments(self.current_job_id),
+                    self._suggestions_for(self.current_job_id),
+                )
+
+    def _review_spelling(self) -> None:
+        if self.current_job_id is None:
+            return
+        job_id = self.current_job_id
+        dialog = SpellingReviewDialog(self.i18n, self.db, job_id, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._select_job(job_id)
+            self.statusBar().showMessage(self.i18n.t("spelling_review_applied"), 5000)
 
     def _job_menu(self, job_id: int, position) -> None:
         job = self.db.job(job_id)

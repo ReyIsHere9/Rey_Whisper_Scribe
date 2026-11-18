@@ -51,7 +51,9 @@ CREATE TABLE IF NOT EXISTS spell_edits (
     original TEXT NOT NULL,
     replacement TEXT NOT NULL,
     source TEXT NOT NULL,
-    confidence REAL NOT NULL
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'applied',
+    alternatives TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE INDEX IF NOT EXISTS idx_spell_edits_job ON spell_edits(job_id);
